@@ -1,4 +1,4 @@
-package MiniDNS;
+package P2Anel;
 
 import javax.crypto.Cipher;
 import javax.crypto.Mac;
