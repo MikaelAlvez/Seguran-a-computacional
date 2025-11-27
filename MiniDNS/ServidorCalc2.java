@@ -24,7 +24,7 @@ public class ServidorCalc2 {
         dir.close();
 
         ServerSocket servidor = new ServerSocket(PORTA);
-        System.out.println("🧮 ServidorCalc1 ativo (" + ENDERECO + ":" + PORTA + ")");
+        System.out.println("🧮 ServidorCalc2 ativo (" + ENDERECO + ":" + PORTA + ")");
 
         while (true) {
             Socket cliente = servidor.accept();
