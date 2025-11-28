@@ -36,7 +36,6 @@ public class ServidorDeLocalizacaoEAutenticacao {
     // Simulação de credenciais válidas: ID -> Chave (Token)
     private static final Map<String, String> CREDENCIAIS = new HashMap<>();
     static {
-        // Dispositivos (D4 foi adicionado para cumprir o requisito de 4)
         CREDENCIAIS.put("D1_Correto", "keyD1");
         CREDENCIAIS.put("D2_Correto", "keyD2");
         CREDENCIAIS.put("D3_Correto", "keyD3");
@@ -69,7 +68,7 @@ public class ServidorDeLocalizacaoEAutenticacao {
             String tipoServico = (String) ois.readObject(); // "BORDA" ou "DATACENTER"
 
             LocalizacaoResponse response;
-            // 2. Autenticação: Verifica se o ID existe e se o token é correto
+            // Autenticação: Verifica se o ID existe e se o token é correto
             boolean autenticado = CREDENCIAIS.containsKey(id) && CREDENCIAIS.get(id).equals(token);
 
             if (autenticado) {
@@ -95,7 +94,9 @@ public class ServidorDeLocalizacaoEAutenticacao {
         } catch (Exception e) {
             System.err.println("Erro no tratamento da conexão de localização: " + e.getMessage());
         } finally {
-            try { socket.close(); } catch (IOException e) { /* ignore */ }
+            try { socket.close(); } catch (IOException e) {
+            	
+            }
         }
     }
 }

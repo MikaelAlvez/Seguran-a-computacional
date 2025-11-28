@@ -22,13 +22,13 @@ public class ServidorDatacenter {
     
     public static void main(String[] args) {
         try {
-            // 1. Geração e Salvamento da Chave Pública RSA
+            // Geração e Salvamento da Chave Pública RSA
             KeyPair keyPair = CriptografiaHibrida.generateRSAKeyPair();
             rsaPrivateKey = keyPair.getPrivate();
             PublicKey rsaPublicKey = keyPair.getPublic();
             CriptografiaHibrida.savePublicKeyToFile(rsaPublicKey, DATACENTER_PUB_KEY_FILE);
 
-            // 2. Carrega dados de sessões anteriores
+            // Carrega dados de sessões anteriores
             loadDataFromDatabase();
 
             System.out.println("--- DATACENTER INICIADO ---");
@@ -106,7 +106,7 @@ public class ServidorDatacenter {
         }
     }
 
-    // --- Simulação de Banco de Dados Escalável (Persistência em Arquivo) ---
+    // Simulação de Banco de Dados Escalável (Persistência em Arquivo)
 
     private static void saveDataToDatabase(DadosColetados dados) {
         try (FileOutputStream fos = new FileOutputStream(DATABASE_FILE, true); 
@@ -141,7 +141,7 @@ public class ServidorDatacenter {
                 }
             }
         } catch (IOException e) {
-            // Ignorar
+
         }
     }
 }

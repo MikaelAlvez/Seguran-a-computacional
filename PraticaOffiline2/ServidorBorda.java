@@ -27,18 +27,18 @@ public class ServidorBorda {
     public static void main(String[] args) {
         System.out.println("--- BORDA INICIADA ---");
         try {
-            // 1. Geração e Salvamento das Chaves RSA da Borda
+            // Geração e Salvamento das Chaves RSA da Borda
             KeyPair keyPair = CriptografiaHibrida.generateRSAKeyPair();
             rsaPrivateKey = keyPair.getPrivate();
             PublicKey rsaPublicKey = keyPair.getPublic();
             CriptografiaHibrida.savePublicKeyToFile(rsaPublicKey, BORDA_PUB_KEY_FILE);
 
-            // 2. Carrega a Chave Pública do Datacenter
+            // Carrega a Chave Pública do Datacenter
             datacenterPublicKey = CriptografiaHibrida.loadPublicKeyFromFile(ServidorDatacenter.DATACENTER_PUB_KEY_FILE);
 
             System.out.println("Borda: Chaves RSA geradas/carregadas. Aguardando Dispositivos na porta UDP " + UDP_PORT + "...");
             
-            // 3. Inicia o listener UDP
+            // Inicia o listener UDP
             startUDPListener();
             
         } catch (Exception e) {
@@ -60,7 +60,7 @@ public class ServidorBorda {
     
     private static void processUDPPacket(DatagramPacket packet) {
         try {
-            // 1. Descriptografia Híbrida (UDP)
+            // Descriptografia Híbrida (UDP)
             byte[] data = new byte[packet.getLength()];
             System.arraycopy(packet.getData(), 0, data, 0, packet.getLength());
             MensagemCriptografada msg = (MensagemCriptografada) CriptografiaHibrida.deserialize(data);
@@ -70,21 +70,21 @@ public class ServidorBorda {
                 msg.getDadosCriptografados(), aesKey);
             DadosColetados dados = (DadosColetados) CriptografiaHibrida.deserialize(decryptedData);
             
-            // 2. Autenticação e Verificação de Dispositivo Inválido (Simulado)
+            // Autenticação e Verificação de Dispositivo Inválido (Simulado)
             if (dados.getDispositivoId().startsWith("DI_")) {
                 System.err.println("⚠️ BORDA: PACOTE REJEITADO! Dispositivo Inválido (" + dados.getDispositivoId() + "). Descartando pacote.");
                 return;
             }
             
-            // 3. Análise Rápida (Alerta de Borda)
+            // Análise Rápida (Alerta de Borda)
             if (dados.getTemperatura() > 39.0) {
                  System.out.println("🚨 BORDA ALERTA RÁPIDO: Dispositivo " + dados.getDispositivoId() + " detectou TEMP EXTREMA.");
             }
 
-            // 4. Implementação do Cache
+            // Implementação do Cache
             addToCache(dados);
 
-            // 5. Envio do Dado ao Datacenter (TCP Criptografado)
+            // Envio do Dado ao Datacenter (TCP Criptografado)
             forwardToDatacenter(dados);
             
         } catch (Exception e) {

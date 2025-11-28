@@ -50,7 +50,7 @@ public class Dispositivo {
     }
 
     private void iniciarColeta() {
-        // 1. Descoberta e 2. Autenticação (Redirecionamento para Borda)
+        // Descoberta e Autenticação (Redirecionamento para Borda)
         LocalizacaoResponse response = localizarESeAutenticar("BORDA");
 
         if (response == null || !response.isAutenticado()) {

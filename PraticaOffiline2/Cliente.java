@@ -16,7 +16,7 @@ public class Cliente {
     public static void main(String[] args) throws Exception {
         System.out.println("--- CLIENTE INICIADO ---");
         
-        // 1. Localização e Autenticação (Redirecionamento para Datacenter)
+        // Localização e Autenticação (Redirecionamento para Datacenter)
         LocalizacaoResponse response = localizarESeAutenticar("DATACENTER");
 
         if (response == null || !response.isAutenticado()) {
@@ -83,10 +83,10 @@ public class Cliente {
     }
     
     private static void realizarAnalise(List<DadosColetados> dados) {
-        // ... (O método realizarAnalise é o mesmo da última atualização, com 5 pontos de análise) ...
+        // O método realizarAnalise é o mesmo da última atualização, com 5 pontos de análise
         System.out.println("\n--- ANÁLISE GESTOR URBANO ---");
         
-        // 1. RELATÓRIO: Médias Gerais 
+        // RELATÓRIO: Médias Gerais 
         System.out.println("\n[1. RELATÓRIO DE MÉDIAS]");
         double mediaTemp = dados.stream().mapToDouble(d -> d.getTemperatura()).average().orElse(0.0);
         double mediaCO2 = dados.stream().mapToDouble(d -> d.getCo2()).average().orElse(0.0);
@@ -100,9 +100,8 @@ public class Cliente {
         System.out.printf("Média de Umidade: %.2f %%\n", mediaUmidade);
         System.out.printf("Média de PM2.5: %.2f µg/m³\n", mediaPM25);
         
-        // --------------------------------------------------------------------------------
         
-        // 2. ALERTA: Detecção de Temperatura Crítica
+        // ALERTA: Detecção de Temperatura Crítica
         long alertasTemp = dados.stream()
             .filter(d -> d.getTemperatura() > 35.0)
             .count();
@@ -118,7 +117,7 @@ public class Cliente {
              System.out.println("\n[2. ALERTA DE TEMPERATURA CRÍTICA] Status: OK. Nenhuma medição crítica.");
         }
         
-        // 3. ALERTA: Poluição de Partículas (PM2.5 e PM10)
+        // ALERTA: Poluição de Partículas (PM2.5 e PM10)
         long alertasPM = dados.stream()
             .filter(d -> d.getPm25() > 25.0 || d.getPm10() > 50.0)
             .count();
@@ -130,7 +129,7 @@ public class Cliente {
              System.out.println("\n[3. ALERTA DE POLUIÇÃO POR PARTÍCULAS] Status: OK. Nível de partículas sob controle.");
         }
         
-        // 4. ALERTA: Risco de Poluição Química (CO, NO2, SO2)
+        // ALERTA: Risco de Poluição Química (CO, NO2, SO2)
         long alertasQuimicos = dados.stream()
             .filter(d -> d.getCo() > 4.5 || d.getNo2() > 80.0 || d.getSo2() > 40.0) 
             .count();
@@ -142,7 +141,7 @@ public class Cliente {
              System.out.println("\n[4. ALERTA DE POLUIÇÃO QUÍMICA] Status: OK. Poluentes gasosos controlados.");
         }
         
-        // 5. PREVISÃO/ALERTA: Risco de Seca e Desidratação (Baixa Umidade e Alto UV)
+        // PREVISÃO/ALERTA: Risco de Seca e Desidratação (Baixa Umidade e Alto UV)
         long alertasUmidade = dados.stream()
             .filter(d -> d.getUmidade() < 40.0 && d.getRadiacaoUV() > 8.0) 
             .count();
