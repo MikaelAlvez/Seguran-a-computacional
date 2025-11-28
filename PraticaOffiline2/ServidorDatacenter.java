@@ -9,34 +9,34 @@ import java.util.concurrent.Executors;
 import javax.crypto.SecretKey;
 
 public class ServidorDatacenter {
-    // Porta para a Borda (Ingestão de dados)
+    public static final String SERVER_IP = "127.0.0.1";
     public static final int TCP_PORT = 8888; 
-    // Porta para o Cliente Gestor_Urbano (Consulta de dados)
     public static final int CLIENT_PORT = 8080; 
     
     public static final String DATACENTER_PUB_KEY_FILE = "datacenter.pub";
+    // Simulação da Base de Dados
+    public static final String DATABASE_FILE = "datacenter_db.txt"; 
     
     private static PrivateKey rsaPrivateKey; 
-    // Lista thread-safe para armazenar os dados recebidos
     private static final List<DadosColetados> dadosHistoricos = Collections.synchronizedList(new LinkedList<>()); 
     
     public static void main(String[] args) {
         try {
-            // Geração e Salvamento da Chave Pública RSA
+            // 1. Geração e Salvamento da Chave Pública RSA
             KeyPair keyPair = CriptografiaHibrida.generateRSAKeyPair();
             rsaPrivateKey = keyPair.getPrivate();
             PublicKey rsaPublicKey = keyPair.getPublic();
             CriptografiaHibrida.savePublicKeyToFile(rsaPublicKey, DATACENTER_PUB_KEY_FILE);
 
+            // 2. Carrega dados de sessões anteriores
+            loadDataFromDatabase();
+
             System.out.println("--- DATACENTER INICIADO ---");
+            System.out.println("Carregados " + dadosHistoricos.size() + " registros do banco de dados.");
             
-            // Inicializa o serviço para executar múltiplos listeners concorrentemente
             ExecutorService executor = Executors.newFixedThreadPool(2);
             
-            // Inicia o listener para receber dados da Borda (Porta 8888)
             executor.submit(ServidorDatacenter::startBordaListener);
-            
-            // Inicia o listener para atender requisições de consulta do Cliente (Porta 8080)
             executor.submit(ServidorDatacenter::startClientListener);
             
         } catch (Exception e) {
@@ -44,7 +44,6 @@ public class ServidorDatacenter {
         }
     }
     
-    // Listener dedicado a receber dados da Borda (Ingestão)
     private static void startBordaListener() {
         try (ServerSocket serverSocket = new ServerSocket(TCP_PORT)) {
             System.out.println("Aguardando dados da Borda na porta TCP " + TCP_PORT + "...");
@@ -57,13 +56,11 @@ public class ServidorDatacenter {
         }
     }
 
-    // Listener dedicado a atender requisições de consulta do Cliente
     private static void startClientListener() {
         try (ServerSocket clientServerSocket = new ServerSocket(CLIENT_PORT)) {
             System.out.println("Aguardando requisições do Cliente na porta TCP " + CLIENT_PORT + "...");
             while (true) {
                 Socket clientSocket = clientServerSocket.accept();
-                // Atende a requisição em uma nova thread
                 new Thread(() -> handleClientRequest(clientSocket)).start();
             }
         } catch (IOException e) {
@@ -71,41 +68,33 @@ public class ServidorDatacenter {
         }
     }
 
-    // Processa a conexão da Borda (Recebimento de dados)
     private static void handleBordaConnection(Socket socket) {
         try (ObjectInputStream ois = new ObjectInputStream(socket.getInputStream())) {
             
+            // Descriptografia Híbrida (Borda -> Datacenter)
             MensagemCriptografada msg = (MensagemCriptografada) ois.readObject();
-            
-            // Descriptografar a chave AES com a chave PRIVADA do Datacenter
             SecretKey aesKey = CriptografiaHibrida.decryptAESKeyWithRSA(
                 msg.getChaveSimetricaCriptografada(), rsaPrivateKey);
-            
-            // Descriptografar os Dados com a chave AES
             byte[] decryptedData = CriptografiaHibrida.decryptAES(
                 msg.getDadosCriptografados(), aesKey);
-            
-            // Deserializar para obter os Dados Coletados
             DadosColetados dados = (DadosColetados) CriptografiaHibrida.deserialize(decryptedData);
             
-            // Armazena os dados
+            // Armazena e Persiste
             dadosHistoricos.add(dados);
-            System.out.println("Datacenter recebeu e armazenou: " + dados.toString());
+            saveDataToDatabase(dados); 
+            System.out.println("Datacenter recebeu e armazenou: " + dados.getDispositivoId());
             
         } catch (Exception e) {
             System.err.println("Datacenter: Erro de descriptografia/armazenamento. Pacote da Borda Descartado. " + e.getMessage());
         } finally {
-            try { socket.close(); } catch (IOException e) {
-            	
-            }
+            try { socket.close(); } catch (IOException e) { /* ignorar */ }
         }
     }
     
-    // Processa a conexão do Cliente (Consulta de dados)
     private static void handleClientRequest(Socket socket) {
         try (ObjectOutputStream oos = new ObjectOutputStream(socket.getOutputStream())) {
             
-            // Envia toda a lista de DadosColetados serializada
+            // Envia todos os dados
             oos.writeObject(dadosHistoricos);
             oos.flush();
             System.out.println("Datacenter enviou " + dadosHistoricos.size() + " dados históricos ao Cliente Gestor_Urbano.");
@@ -113,13 +102,46 @@ public class ServidorDatacenter {
         } catch (Exception e) {
             System.err.println("Datacenter: Erro ao atender requisição do Cliente. " + e.getMessage());
         } finally {
-            try { socket.close(); } catch (IOException e) { 
-            	
-            }
+            try { socket.close(); } catch (IOException e) { /* ignorar */ }
         }
     }
 
-    public static List<DadosColetados> getDadosHistoricos() {
-        return dadosHistoricos;
+    // --- Simulação de Banco de Dados Escalável (Persistência em Arquivo) ---
+
+    private static void saveDataToDatabase(DadosColetados dados) {
+        try (FileOutputStream fos = new FileOutputStream(DATABASE_FILE, true); 
+             ObjectOutputStream oos = new ObjectOutputStream(fos) {
+                 protected void writeStreamHeader() throws IOException {} 
+             }) 
+        {
+            oos.writeObject(dados);
+        } catch (IOException e) {
+            System.err.println("Erro ao persistir dados: " + e.getMessage());
+        }
+    }
+    
+    private static void loadDataFromDatabase() {
+        File file = new File(DATABASE_FILE);
+        if (!file.exists() || file.length() == 0) {
+            return;
+        }
+
+        try (FileInputStream fis = new FileInputStream(file);
+             ObjectInputStream ois = new ObjectInputStream(fis)) {
+            
+            while (true) {
+                try {
+                    DadosColetados dados = (DadosColetados) ois.readObject();
+                    dadosHistoricos.add(dados);
+                } catch (EOFException e) {
+                    break; 
+                } catch (ClassNotFoundException | IOException e) {
+                    System.err.println("Erro durante o carregamento do DB: " + e.getMessage());
+                    break;
+                }
+            }
+        } catch (IOException e) {
+            // Ignorar
+        }
     }
 }
