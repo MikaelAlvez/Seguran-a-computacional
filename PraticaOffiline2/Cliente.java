@@ -2,8 +2,10 @@ package PraticaOffiline2;
 
 import java.io.*;
 import java.net.*;
+import java.security.PublicKey;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
+import javax.crypto.SecretKey;
 
 public class Cliente {
     // Credenciais do Cliente Gestor Urbano
@@ -13,21 +15,44 @@ public class Cliente {
     private static String DATACENTER_IP = null;
     private static int DATACENTER_CONSULTA_PORT = 0; 
     
+    // Chaves públicas necessárias
+    private static PublicKey authPublicKey; 
+    private static PublicKey locPublicKey;  
+    
     public static void main(String[] args) throws Exception {
         System.out.println("--- CLIENTE INICIADO ---");
         
-        // Localização e Autenticação (Redirecionamento para Datacenter)
-        LocalizacaoResponse response = localizarESeAutenticar("DATACENTER");
+        // 1. CARREGAMENTO DAS CHAVES PÚBLICAS
+        try {
+            authPublicKey = CriptografiaHibrida.loadPublicKeyFromFile(ServidorDeAutenticacao.AUTH_PUB_KEY_FILE);
+            locPublicKey = CriptografiaHibrida.loadPublicKeyFromFile(ServidorDeLocalizacao.LOC_PUB_KEY_FILE); 
+            System.out.println("Cliente: Chaves públicas carregadas com sucesso (Auth, Loc).");
+        } catch (Exception e) {
+            System.err.println("ERRO: Não foi possível carregar todas as chaves públicas. " + e.getMessage());
+            return;
+        }
 
-        if (response == null || !response.isAutenticado()) {
-            System.err.println("Cliente " + CLIENTE_ID + ": Autenticação falhou ou Localização indisponível. Encerrando.");
+        // FASE 1: AUTENTICAÇÃO (TCP Híbrido)
+        AutenticacaoResponse authResponse = solicitarAutenticacao(CLIENTE_ID, CLIENTE_TOKEN, authPublicKey);
+
+        if (authResponse == null || !authResponse.isAutenticado()) {
+            System.err.println("Cliente " + CLIENTE_ID + ": Autenticação falhou. Encerrando.");
+            return;
+        }
+        System.out.println("Cliente " + CLIENTE_ID + ": " + authResponse.getMensagem());
+        
+        // FASE 2: LOCALIZAÇÃO (TCP Híbrido)
+        LocalizacaoResponse locResponse = solicitarLocalizacao(CLIENTE_ID, "DATACENTER", locPublicKey);
+
+        if (locResponse == null || !locResponse.isAutenticado()) {
+            System.err.println("Cliente " + CLIENTE_ID + ": Localização indisponível. Encerrando.");
             return;
         }
         
-        DATACENTER_IP = response.getEnderecoServico();
-        DATACENTER_CONSULTA_PORT = response.getPortaServico();
+        DATACENTER_IP = locResponse.getEnderecoServico();
+        DATACENTER_CONSULTA_PORT = locResponse.getPortaServico();
         
-        System.out.println("Cliente Gestor_Urbano autenticado. Servidor Datacenter em " + DATACENTER_IP + ":" + DATACENTER_CONSULTA_PORT + ".");
+        System.out.println("Cliente Gestor_Urbano localizado. Servidor Datacenter em " + DATACENTER_IP + ":" + DATACENTER_CONSULTA_PORT + ".");
         
         int tempoEsperaSegundos = 60; 
         System.out.println("Aguardando coleta de dados (Simulação por " + tempoEsperaSegundos + "s)...");
@@ -40,30 +65,79 @@ public class Cliente {
         consultarEProcessarDados();
     }
     
-    private static LocalizacaoResponse localizarESeAutenticar(String tipoServico) {
-        try (Socket socket = new Socket(ServidorDeLocalizacaoEAutenticacao.SERVER_IP, ServidorDeLocalizacaoEAutenticacao.LOCALIZACAO_PORT);
+    // --- MÉTODOS DE COMUNICAÇÃO HÍBRIDA (NOVA ARQUITETURA) ---
+
+    private static AutenticacaoResponse solicitarAutenticacao(String id, String token, PublicKey authPublicKey) {
+        try (Socket socket = new Socket(ServidorDeAutenticacao.SERVER_IP, ServidorDeAutenticacao.AUTH_PORT);
              ObjectOutputStream oos = new ObjectOutputStream(socket.getOutputStream());
              ObjectInputStream ois = new ObjectInputStream(socket.getInputStream())) {
 
-            oos.writeObject(CLIENTE_ID);
-            oos.writeObject(CLIENTE_TOKEN);
-            oos.writeObject(tipoServico);
-            oos.flush();
+            MensagemLogin login = new MensagemLogin(id, token, null); 
+            SecretKey aesKey = enviarRequisicaoHibrida(oos, login, authPublicKey);
 
-            return (LocalizacaoResponse) ois.readObject();
+            return (AutenticacaoResponse) receberRespostaHibrida(ois, aesKey);
 
+        } catch (ConnectException e) {
+            System.err.println("Cliente " + id + ": Falha ao conectar ao Servidor de Autenticação.");
+            return null;
         } catch (Exception e) {
-            System.err.println("Cliente " + CLIENTE_ID + ": Falha ao se comunicar com o Servidor de Localização. " + e.getMessage());
+            System.err.println("Cliente " + id + ": Erro no processo de Autenticação. " + e.getMessage());
+            return null;
+        }
+    }
+
+    private static LocalizacaoResponse solicitarLocalizacao(String id, String tipoServico, PublicKey locPublicKey) {
+         try (Socket socket = new Socket(ServidorDeLocalizacao.SERVER_IP, ServidorDeLocalizacao.LOC_PORT);
+             ObjectOutputStream oos = new ObjectOutputStream(socket.getOutputStream());
+             ObjectInputStream ois = new ObjectInputStream(socket.getInputStream())) {
+
+            MensagemLogin requisicao = new MensagemLogin(id, null, tipoServico);
+            SecretKey aesKey = enviarRequisicaoHibrida(oos, requisicao, locPublicKey);
+
+            return (LocalizacaoResponse) receberRespostaHibrida(ois, aesKey);
+
+        } catch (ConnectException e) {
+            System.err.println("Cliente " + id + ": Falha ao conectar ao Servidor de Localização.");
+            return null;
+        } catch (Exception e) {
+            System.err.println("Cliente " + id + ": Erro no processo de Localização. " + e.getMessage());
             return null;
         }
     }
     
+    // Métodos utilitários de comunicação (copiados de Dispositivo, renomeados para static)
+    private static SecretKey enviarRequisicaoHibrida(ObjectOutputStream oos, Serializable payload, PublicKey serverPublicKey) throws Exception {
+        byte[] payloadSerializado = CriptografiaHibrida.serialize(payload);
+        
+        SecretKey aesKey = CriptografiaHibrida.generateAESKey();
+        byte[] payloadCriptografado = CriptografiaHibrida.encryptAES(payloadSerializado, aesKey);
+        
+        byte[] chaveAESCriptografada = CriptografiaHibrida.encryptAESKeyWithRSA(aesKey, serverPublicKey);
+        
+        MensagemCriptografada msgRequisicao = new MensagemCriptografada(chaveAESCriptografada, payloadCriptografado);
+        oos.writeObject(msgRequisicao);
+        oos.flush();
+        
+        return aesKey;
+    }
+
+    private static Object receberRespostaHibrida(ObjectInputStream ois, SecretKey aesKey) throws Exception {
+        MensagemCriptografada msgResposta = (MensagemCriptografada) ois.readObject();
+        
+        byte[] responseCriptografada = msgResposta.getDadosCriptografados();
+        byte[] responseDecrypted = CriptografiaHibrida.decryptAES(responseCriptografada, aesKey);
+        
+        return CriptografiaHibrida.deserialize(responseDecrypted);
+    }
+    
+    // --- LÓGICA DE CONSULTA E ANÁLISE ---
+
     private static void consultarEProcessarDados() {
+        // ... (Corpo do método permanece o mesmo do código original)
         System.out.println("\n--- INICIANDO CONSULTA DE DADOS ---");
         try (Socket socket = new Socket(DATACENTER_IP, DATACENTER_CONSULTA_PORT);
              ObjectInputStream ois = new ObjectInputStream(socket.getInputStream())) {
             
-            // Lógica de consulta (Permanece TCP/Criptografada)
             @SuppressWarnings("unchecked")
             List<DadosColetados> dados = (List<DadosColetados>) ois.readObject();
             
@@ -83,7 +157,7 @@ public class Cliente {
     }
     
     private static void realizarAnalise(List<DadosColetados> dados) {
-        // O método realizarAnalise é o mesmo da última atualização, com 5 pontos de análise
+        // ... (Corpo do método permanece o mesmo do código original)
         System.out.println("\n--- ANÁLISE GESTOR URBANO ---");
         
         // RELATÓRIO: Médias Gerais 
