@@ -5,99 +5,77 @@ import java.time.LocalDateTime;
 import java.util.Random;
 
 public class DadosColetados implements Serializable {
-    private static final long serialVersionUID = 1L; 
+    private static final long serialVersionUID = 1L;
     
     private final String dispositivoId;
     private final LocalDateTime timestamp;
     
     // Poluentes Atmosféricos
-    private final double co2; 
-    private final double co;     // Monóxido de Carbono
-    private final double no2;    // Dióxido de Nitrogênio
-    private final double so2;    // Dióxido de Enxofre
+    private final double co2;
+    private final double co;
+    private final double no2;
+    private final double so2;
     
-    // Partículas 
-    private final double pm25;   
-    private final double pm10;   // Partículas Maiores
+    // Partículas
+    private final double pm25;
+    private final double pm10;
     
     // Condições Climáticas
-    private final double temperatura; // Temperatura já existia
-    private final double umidade;    // Umidade Relativa do Ar
-    private final double radiacaoUV; // Índice de Radiação UV
+    private final double temperatura; 
+    private final double umidade;
+    private final double radiacaoUV;
     
-    private final double ruido;      // Ruído Urbano (dB)
+    private final double ruido;
     
-    // Construtor que gera dados aleatórios para simulação
+    // Construtor principal para dados normais
     public DadosColetados(String dispositivoId) {
+        this(dispositivoId, false);
+    }
+    
+    // Construtor auxiliar para simular dados normais ou anômalos
+    public DadosColetados(String dispositivoId, boolean anomalia) {
         this.dispositivoId = dispositivoId;
         this.timestamp = LocalDateTime.now();
         Random r = new Random();
         
         // Poluentes (ppm / ppb)
-        this.co2 = 300 + (r.nextDouble() * 700);        // 300 a 1000 ppm
-        this.co = r.nextDouble() * 10.0;                // 0 a 10 ppm
-        this.no2 = 10 + (r.nextDouble() * 90);          // 10 a 100 ppb
-        this.so2 = 5 + (r.nextDouble() * 45);           // 5 a 50 ppb
+        this.co2 = 300 + (r.nextDouble() * 700);
+        this.co = r.nextDouble() * 10.0;
+        this.no2 = 10 + (r.nextDouble() * 90);
+        this.so2 = 5 + (r.nextDouble() * 45);
 
         // Partículas (µg/m³)
-        this.pm25 = r.nextDouble() * 50;                // 0 a 50 µg/m³
-        this.pm10 = 10 + (r.nextDouble() * 90);         // 10 a 100 µg/m³
+        this.pm25 = r.nextDouble() * 50;
+        this.pm10 = 10 + (r.nextDouble() * 90);
         
         // Condições Climáticas
-        this.temperatura = 15 + (r.nextDouble() * 25);  // 15 a 40 °C
-        this.umidade = 40 + (r.nextDouble() * 50);      // 40 a 90 %
-        this.radiacaoUV = r.nextDouble() * 12;          // 0 a 12 (Índice UV)
+        if (anomalia) {
+            // Anomalia: Temperatura muito alta (para ser detectada pelo IDS/IPS)
+            this.temperatura = 95.0 + (r.nextDouble() * 10.0); // 95.0 a 105.0 °C
+        } else {
+            // Normal: 15 a 40 °C
+            this.temperatura = 15 + (r.nextDouble() * 25); 
+        }
+
+        this.umidade = 40 + (r.nextDouble() * 50);
+        this.radiacaoUV = r.nextDouble() * 12;
         
-        this.ruido = 40 + (r.nextDouble() * 50);        // 40 a 90 dB
+        this.ruido = 40 + (r.nextDouble() * 50);
     }
 
-    public String getDispositivoId() {
-        return dispositivoId;
-    }
-
-    public LocalDateTime getTimestamp() {
-        return timestamp;
-    }
-
-    public double getCo2() {
-        return co2;
-    }
-    
-    public double getCo() {
-        return co;
-    }
-
-    public double getNo2() {
-        return no2;
-    }
-
-    public double getSo2() {
-        return so2;
-    }
-    
-    public double getPm10() {
-        return pm10;
-    }
-
-    public double getUmidade() {
-        return umidade;
-    }
-    
-    public double getRadiacaoUV() {
-        return radiacaoUV;
-    }
-    
-    public double getTemperatura() {
-        return temperatura;
-    }
-
-    public double getRuido() {
-        return ruido;
-    }
-
-    public double getPm25() {
-        return pm25;
-    }
+    // Getters e toString permanecem inalterados
+    public String getDispositivoId() { return dispositivoId; }
+    public LocalDateTime getTimestamp() { return timestamp; }
+    public double getCo2() { return co2; }
+    public double getCo() { return co; }
+    public double getNo2() { return no2; }
+    public double getSo2() { return so2; }
+    public double getPm10() { return pm10; }
+    public double getUmidade() { return umidade; }
+    public double getRadiacaoUV() { return radiacaoUV; }
+    public double getTemperatura() { return temperatura; }
+    public double getRuido() { return ruido; }
+    public double getPm25() { return pm25; }
     
     @Override
     public String toString() {
